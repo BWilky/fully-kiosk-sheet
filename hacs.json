@@ -1,0 +1,6 @@
+{
+  "name": "Fully Kiosk Sheet",
+  "render_readme": true,
+  "filename": "fully-kiosk-sheet.js",
+  "homeassistant": "2024.8.0"
+}
