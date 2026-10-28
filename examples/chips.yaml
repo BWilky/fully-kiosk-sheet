@@ -1,18 +1,31 @@
-# A row of chips. `tablet:` is optional: inside Fully it's this tablet, elsewhere the first one.
-type: custom:fully-tablet-chips
-alignment: start
+# Chips inside a Mushroom chips card. Mushroom turns `type: X` into <mushroom-X-chip>,
+# so `type: fully-tablet` (+ `chip:`) or the shorthand `type: fully-tablet-<kind>` is the chip.
+# `tablet:` is optional: inside Fully it's this tablet, elsewhere the first one.
+type: custom:mushroom-chips-card
+alignment: center
 chips:
-  - chip: status                 # "60% · On"; tap opens the sheet, hold opens History
+  - type: fully-tablet
+    chip: status                 # "60% · On"; tap opens the sheet, hold opens History
+    name: Kitchen
     show: [battery, screen, app]
-  - chip: screen                 # toggles the screen (natively when it runs on that tablet)
-  - chip: battery                # battery icon + %; tap opens History
-  - chip: history
-  - chip: app                    # launches an Android app on the tablet (from the tablet or a phone)
+    tablets:                     # settings can ride on any chip (or on the button card)
+      - name: Kitchen
+        prefix: tabletkitchen
+        plug: switch.kitchen_tablet_plug
+  - type: fully-tablet-screen    # toggles the screen (natively when it runs on that tablet)
+  - type: fully-tablet-battery   # battery icon + %; tap opens History
+  - type: fully-tablet-app       # launches an Android app on the tablet (from the tablet or a phone)
     app_package: com.spotify.music
-  - chip: app
+  - type: fully-tablet-app
     app_package: com.disney.disneyplus
     name: Disney+
     icon: mdi:television-play
-  - chip: charger                # shows the smart plug; tap opens the Power section
-  - chip: open                   # plain "Tablets" opener (Overview when there are several)
+  - type: fully-tablet-charger   # shows the smart plug; tap opens the Power section
+  - type: fully-tablet-history
+  - type: fully-tablet-open      # plain "Tablets" opener (Overview when there are several)
     name: Tablets
+
+# The same chip as a card of its own, in a sections grid:
+# type: custom:fully-tablet-chip
+# chip: app
+# app_package: com.spotify.music

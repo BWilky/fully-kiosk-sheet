@@ -1,18 +1,29 @@
-# The same chips inside a Mushroom chips card, mixed with Mushroom's own chips.
+# Plain Mushroom chips that launch the sheet or an app, no fully-tablet chip involved.
+# Routes: #tablets  #tablets-history  #tablet-<key>  #tablet-<key>-history
 type: custom:mushroom-chips-card
 alignment: center
 chips:
-  - type: entity
-    entity: weather.home
-  - type: custom:fully-tablet-chip
-    chip: status
-  - type: custom:fully-tablet-chip
-    chip: app
-    app_package: com.spotify.music
-  # or any Mushroom chip with a navigate action to a hash route:
-  - type: template
-    icon: mdi:tablet-dashboard
-    content: Tablet
+  - type: template                  # battery + charging, tap: sheet, hold: history
+    entity: sensor.tabletkitchen_battery
+    icon: "{{ 'mdi:tablet-cellphone' if is_state('binary_sensor.tabletkitchen_plugged_in', 'on') else 'mdi:tablet' }}"
+    icon_color: "{{ 'green' if is_state('binary_sensor.tabletkitchen_plugged_in', 'on') else 'red' if states('sensor.tabletkitchen_battery') | int(100) < 20 else 'blue' }}"
+    content: "{{ states('sensor.tabletkitchen_battery') }}%"
+    tap_action: { action: navigate, navigation_path: "#tablets" }
+    hold_action: { action: navigate, navigation_path: "#tablets-history" }
+  - type: entity                    # screen switch, tap toggles it
+    entity: switch.tabletkitchen_screen
+    icon: mdi:monitor
+    tap_action: { action: toggle }
+  - type: template                  # history chip
+    icon: mdi:chart-timeline-variant
+    content: History
+    tap_action: { action: navigate, navigation_path: "#tablet-kitchen-history" }
+  - type: template                  # launch Spotify on the tablet from anywhere
+    icon: mdi:spotify
+    icon_color: green
+    content: Spotify
     tap_action:
-      action: navigate
-      navigation_path: "#tablets-history"
+      action: perform-action
+      perform_action: fully_kiosk.start_application
+      data: { application: com.spotify.music }
+      target: { device_id: YOUR_TABLET_DEVICE_ID }   # Settings → Devices → the tablet → URL ends in the id

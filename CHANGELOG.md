@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-10-29
+
+- The `fully-tablet-chips` row card is gone. Chips live inside Mushroom's chips card instead:
+  `type: fully-tablet` (+ `chip:`) or `type: fully-tablet-<kind>`. Mushroom builds chip
+  elements as `mushroom-<type>-chip`, so the chip is registered under those names too.
+- `custom:fully-tablet-chip` still works as a card of its own.
+- Examples for plain Mushroom chips that open the sheet by hash route or launch an app.
+
 ## 1.0.2 — 2026-10-28
 
 - Dashboards running inside Fully Kiosk slowed right down: every chip read the whole Fully

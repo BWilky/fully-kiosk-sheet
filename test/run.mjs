@@ -17,9 +17,13 @@ async function page(width, height, prefixes = ["tabletkitchen"], light = false, 
 const shot = (p, name) => p.screenshot({ path: path.join(here, "shots", name + ".png"), fullPage: false });
 const addCards = async (p) => p.evaluate(() => {
   const stage = document.getElementById("stage");
-  const chips = document.createElement("fully-tablet-chips");
-  chips.setConfig({ chips: ["status", "screen", "battery", "history", { chip: "app", app_package: "com.spotify.music" }, { chip: "app", app_package: "com.disney.disneyplus", name: "Disney+" }, { chip: "charger" }, "open"] });
-  chips.hass = window.__hass;
+  // A Mushroom-style chips row: Mushroom creates <mushroom-${type}-chip> for every chip and sets hass on each.
+  const chips = document.createElement("div");
+  chips.id = "chips";
+  chips.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
+  const defs = [{ type: "fully-tablet", chip: "status", tablets: [{ name: "Kitchen", prefix: "tabletkitchen", plug: "switch.kitchen_tablet_plug" }] }, { type: "fully-tablet-screen" }, { type: "fully-tablet", chip: "battery" },
+    { type: "fully-tablet-history" }, { type: "fully-tablet-app", app_package: "com.spotify.music" }, { type: "fully-tablet", chip: "app", app_package: "com.disney.disneyplus", name: "Disney+" }, { type: "fully-tablet-charger" }, { type: "fully-tablet-open" }];
+  for (const cfg of defs) { const el = document.createElement(`mushroom-${cfg.type}-chip`); el.setConfig(cfg); el.hass = window.__hass; chips.appendChild(el); }
   const btn = document.createElement("fully-tablet-sheet-button");
   btn.setConfig({ title: "Tablet Controls", tablets: [{ name: "Kitchen", prefix: "tabletkitchen", plug: "switch.kitchen_tablet_plug" }] });
   btn.hass = window.__hass;
@@ -57,7 +61,7 @@ const calls1 = await p.evaluate(() => window.__calls.filter((c) => c.d));
 // chips: app launch + screen toggle via tap
 await p.evaluate(() => document.querySelector("fully-tablet-sheet")?.close());
 await p.waitForTimeout(400);
-await p.evaluate(() => { const chips = document.querySelector("fully-tablet-chips"); const els = chips.renderRoot.querySelectorAll("fully-tablet-chip"); els[4].renderRoot.querySelector(".chip").click(); els[1].renderRoot.querySelector(".chip").click(); });
+await p.evaluate(() => { const els = document.querySelectorAll("#chips > *"); els[4].renderRoot.querySelector(".chip").click(); els[1].renderRoot.querySelector(".chip").click(); });
 await p.waitForTimeout(400);
 const calls2 = await p.evaluate(() => window.__calls.filter((c) => c.d));
 // hash route
@@ -108,8 +112,7 @@ p = await page(1280, 800, ["tabletkitchen"], false, true);
 await addCards(p);
 await p.waitForTimeout(600);
 const perf = await p.evaluate(async () => {
-  const chips = document.querySelector("fully-tablet-chips");
-  const els = [...chips.renderRoot.querySelectorAll("fully-tablet-chip")];
+  const els = [...document.querySelectorAll("#chips > *")];
   const btn = document.querySelector("fully-tablet-sheet-button");
   let renders = 0;
   for (const el of [...els, btn]) { const orig = el.render.bind(el); el.render = () => { renders++; return orig(); }; }
@@ -118,7 +121,8 @@ const perf = await p.evaluate(async () => {
   for (let i = 0; i < 300; i++) {
     const h = { ...window.__hass, states: { ...window.__hass.states } };
     h.states["sensor.unrelated"] = { entity_id: "sensor.unrelated", state: String(i), attributes: {}, last_updated: new Date().toISOString() };
-    chips.hass = h; btn.hass = h;
+    for (const el of els) el.hass = h;
+    btn.hass = h;
     await new Promise((r) => setTimeout(r, 0));
   }
   const ms = performance.now() - t0;
@@ -126,9 +130,10 @@ const perf = await p.evaluate(async () => {
   const h = { ...window.__hass, states: { ...window.__hass.states } };
   h.states["sensor.tabletkitchen_battery"] = { ...h.states["sensor.tabletkitchen_battery"], state: "42", last_updated: new Date().toISOString() };
   const r0 = renders;
-  chips.hass = h; btn.hass = h;
+  for (const el of els) el.hass = h;
+  btn.hass = h;
   await new Promise((r) => setTimeout(r, 50));
-  return { bridgeCalls: window.__bridgeCalls - before, renders, rendersAfterRealChange: renders - r0, ms: Math.round(ms), localTab: window.fullyTabletSheet.tablets()[0]?.key, text: els[0].renderRoot.querySelector(".tx")?.textContent };
+  return { bridgeCalls: window.__bridgeCalls - before, renders, rendersAfterRealChange: renders - r0, ms: Math.round(ms), localTab: window.fullyTabletSheet.tablets()[0]?.key, text: els[0].renderRoot.querySelector(".tx")?.textContent, tags: els.map((e) => `${e.localName}=${e._config.chip}`).join(",") };
 });
 await shot(p, "13-inside-fully");
 await p.context().close();

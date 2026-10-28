@@ -106,8 +106,8 @@
     static get properties() { return { hass: { attribute: false }, _config: { state: true }, _tick: { state: true }, _busy: { state: true } }; }
     setConfig(config) {
       const cfg = { chip: "status", ...(config || {}) };
-      if (cfg.type && !config?.chip) { // type: custom:fully-tablet-chip-app style aliases
-        const m = String(cfg.type).match(/fully-tablet-chip-(\w+)/);
+      if (cfg.type && !config?.chip) { // type: custom:fully-tablet-chip-app / fully-tablet-app style aliases
+        const m = String(cfg.type).match(/fully-tablet(?:-chip)?-(\w+)$/);
         if (m && CHIP_KINDS.includes(m[1])) cfg.chip = m[1];
       }
       if (cfg.app_package && !config?.chip) cfg.chip = "app";
@@ -273,74 +273,23 @@
     }
   }
   if (!customElements.get("fully-tablet-chip")) customElements.define("fully-tablet-chip", TabletChip);
-  for (const k of CHIP_KINDS) { // type: custom:fully-tablet-chip-app etc.
-    const tag = `fully-tablet-chip-${k}`;
-    if (!customElements.get(tag)) customElements.define(tag, class extends TabletChip { setConfig(c) { super.setConfig({ ...(c || {}), chip: k }); } });
+  /* Mushroom's chips card turns `type: X` into the element <mushroom-X-chip> (no custom: prefix
+     support), so the chip is also registered under that scheme: inside a mushroom-chips-card use
+     `type: fully-tablet` (+ `chip: app` etc.) or the per-kind shorthand `type: fully-tablet-app`. */
+  const aliases = ["mushroom-fully-tablet-chip", ...CHIP_KINDS.map((k) => `mushroom-fully-tablet-${k}-chip`), ...CHIP_KINDS.map((k) => `fully-tablet-chip-${k}`)];
+  for (const tag of aliases) {
+    if (customElements.get(tag)) continue;
+    const kind = CHIP_KINDS.find((k) => tag.endsWith(`-${k}-chip`) || tag.endsWith(`-chip-${k}`));
+    customElements.define(tag, class extends TabletChip {
+      setConfig(c) { super.setConfig(kind ? { ...(c || {}), chip: kind } : c); }
+    });
   }
-
-  /* ================================================================== */
-  /* Chips row card                                                      */
-  /* ================================================================== */
-  class TabletChips extends Base {
-    static get properties() { return { hass: { attribute: false }, _config: { state: true } }; }
-    setConfig(config) {
-      if (!config || !Array.isArray(config.chips) || !config.chips.length) {
-        this._config = { ...(config || {}), chips: [{ chip: "status" }, { chip: "screen" }, { chip: "history" }] };
-      } else this._config = config;
-      configure(this._config);
-      this._els = null;
-    }
-    getCardSize() { return 1; }
-    getGridOptions() { return { columns: "full", rows: 1, min_rows: 1 }; }
-    static getStubConfig() { return { chips: [{ chip: "status" }, { chip: "screen" }, { chip: "history" }] }; }
-
-    _buildChips() {
-      const base = { tablet: this._config.tablet, show: this._config.show, name: undefined };
-      this._els = this._config.chips.map((raw) => {
-        const cfg = typeof raw === "string" ? { chip: raw } : { ...raw };
-        if (cfg.tablet === undefined && base.tablet) cfg.tablet = base.tablet;
-        if (cfg.show === undefined && base.show) cfg.show = base.show;
-        const el = document.createElement("fully-tablet-chip");
-        try { el.setConfig(cfg); } catch (err) {
-          const e = document.createElement("div");
-          e.textContent = err.message;
-          e.style.cssText = "font-size:12px;color:var(--error-color)";
-          return e;
-        }
-        return el;
-      });
-    }
-    shouldUpdate(changed) {
-      if (changed.size === 1 && changed.has("hass") && this._els) {
-        this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
-        return false;
-      }
-      return true;
-    }
-    render() {
-      if (!this._config) return html``;
-      if (!this._els) this._buildChips();
-      this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
-      return html`<div class="row ${this._config.alignment || "start"}">${this._els}</div>`;
-    }
-    static get styles() {
-      return css`
-        :host { display: block; }
-        .row { display: flex; flex-wrap: wrap; gap: var(--chip-spacing, 8px); align-items: center; }
-        .row.center { justify-content: center; }
-        .row.end { justify-content: flex-end; }
-        .row.justify { justify-content: space-between; }
-      `;
-    }
-  }
-  if (!customElements.get("fully-tablet-chips")) customElements.define("fully-tablet-chips", TabletChips);
 
   /* ---------- card picker ---------- */
   window.customCards = window.customCards || [];
   const add = (type, name, description) => { if (!window.customCards.some((c) => c.type === type)) window.customCards.push({ type, name, description, preview: false }); };
   add("fully-tablet-sheet-button", "Fully tablet sheet button", "Tile that opens the Fully Kiosk tablet sheet: screens, brightness, restarts, history.");
-  add("fully-tablet-chips", "Fully tablet chips", "A row of Mushroom-style chips for a Fully Kiosk tablet: status, screen, battery, history, app launchers.");
-  add("fully-tablet-chip", "Fully tablet chip", "One chip for a Fully Kiosk tablet. Also usable inside mushroom-chips-card as type: custom:fully-tablet-chip.");
+  add("fully-tablet-chip", "Fully tablet chip", "A chip for a Fully Kiosk tablet: status, screen, battery, history, app launcher, charger or opener. Inside a mushroom-chips-card use type: fully-tablet.");
 
   /* Warm HA's icon cache while the dashboard is idle, so the first open of the sheet doesn't
      wait on a dozen icon-chunk fetches (noticeable on tablets whose web storage gets cleared). */

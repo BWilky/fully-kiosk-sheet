@@ -13,10 +13,10 @@
  *   fully-tablet-sheet-button   a tile-style card that opens the sheet.
  *   fully-tablet-chip           a Mushroom-style chip. Kinds: status, screen,
  *                               battery, history, app (launches an Android app
- *                               on the tablet), open.
- *   fully-tablet-chips          a row of those chips (no Mushroom needed; the
- *                               chip also works inside mushroom-chips-card as
- *                               type: custom:fully-tablet-chip).
+ *                               on the tablet), charger, open. A card on its
+ *                               own, or inside mushroom-chips-card as
+ *                               `type: fully-tablet` (Mushroom names chip
+ *                               elements mushroom-<type>-chip).
  *
  * Tablets come from the Home Assistant fully_kiosk integration. Leave `tablets:`
  * out and every Fully Kiosk device is discovered; list them to pick names,
@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.0.2";
+  const VERSION = "1.1.0";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */

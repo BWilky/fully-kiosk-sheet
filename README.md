@@ -6,8 +6,7 @@ Fully Kiosk Browser tablet controls for Home Assistant, in one resource. The cus
 |---|---|
 | `fully-tablet-sheet` | The sheet. Phones get a bottom sheet, tablets and desktops a centred dialog with a sidebar. Each tablet has **Controls** (screenshot, screen, brightness, browser actions, charger power cycle, restart) and **History** (screen on/off timeline, charger bands, app in front, battery curve, stats, activity log). |
 | `fully-tablet-sheet-button` | A tile-style card that opens the sheet. |
-| `fully-tablet-chip` | A Mushroom-style chip: `status`, `screen`, `battery`, `history`, `app`, `charger`, `open`. Works inside `mushroom-chips-card` too. |
-| `fully-tablet-chips` | A row of those chips, no Mushroom needed. |
+| `fully-tablet-chip` | A Mushroom-style chip: `status`, `screen`, `battery`, `history`, `app`, `charger`, `open`. A card on its own, or inside a `mushroom-chips-card` as `type: fully-tablet`. |
 
 Tablets come from the [Fully Kiosk Browser integration](https://www.home-assistant.io/integrations/fully_kiosk/).
 Leave `tablets:` out and every Fully device is discovered. One tablet is fine: the tab row and the
@@ -45,29 +44,64 @@ tap_action: { action: open-sheet }     # defaults: tap opens the sheet, hold ope
 hold_action: { action: open-history }
 ```
 
-### Chips row
+### Chips
+
+Inside a Mushroom chips card (Mushroom turns `type: X` into the element `mushroom-X-chip`, so
+`type: fully-tablet` is the chip and `type: fully-tablet-app` is the per-kind shorthand):
 
 ```yaml
-type: custom:fully-tablet-chips
-alignment: start               # start | center | end | justify
-tablet: kitchen                # optional default for every chip
+type: custom:mushroom-chips-card
+alignment: center
 chips:
-  - chip: status               # "60% · On" — tap: sheet, hold: history
+  - type: fully-tablet            # status: "60% · On" — tap opens the sheet, hold opens History
+    chip: status
+    name: Kitchen
     show: [battery, screen, app]
-  - chip: screen               # toggles the screen
-  - chip: battery              # tap: history
-  - chip: history
-  - chip: app                  # launches an Android app on the tablet, from the tablet or a phone
+    tablets:                      # settings can ride on any chip
+      - name: Kitchen
+        prefix: tabletkitchen
+        plug: switch.kitchen_tablet_plug
+  - type: fully-tablet-screen     # toggles the screen
+  - type: fully-tablet-battery    # tap: History
+  - type: fully-tablet-app        # launches an Android app on the tablet, from the tablet or a phone
     app_package: com.spotify.music
-  - chip: charger              # the smart plug (needs `plug:` on the tablet)
-  - chip: open                 # plain opener (Overview when there are several tablets)
+  - type: fully-tablet-charger    # the smart plug (needs `plug:` on the tablet)
+  - type: fully-tablet-history
+  - type: fully-tablet-open       # plain opener (Overview when there are several tablets)
+```
+
+As a card of its own (sections grid, 3 columns wide by default):
+
+```yaml
+type: custom:fully-tablet-chip
+chip: app
+app_package: com.disney.disneyplus
+name: Disney+
+icon: mdi:television-play
 ```
 
 Every chip takes `name`, `icon`, `icon_color` (Mushroom colour names, `#hex` or `r, g, b`),
 `content` (override the text), `tablet`, `tap_action` and `hold_action`.
 
-Inside a Mushroom chips card: `type: custom:fully-tablet-chip` plus the same keys, or the
-shorthand types `custom:fully-tablet-chip-app`, `custom:fully-tablet-chip-status` and so on.
+Plain Mushroom chips work too, with a hash route or an action; see
+[`examples/mushroom-chips.yaml`](examples/mushroom-chips.yaml):
+
+```yaml
+type: custom:mushroom-chips-card
+chips:
+  - type: template
+    icon: mdi:tablet-dashboard
+    content: "{{ states('sensor.tabletkitchen_battery') }}%"
+    tap_action: { action: navigate, navigation_path: "#tablets" }
+    hold_action: { action: navigate, navigation_path: "#tablets-history" }
+  - type: template
+    icon: mdi:spotify
+    tap_action:
+      action: perform-action
+      perform_action: fully_kiosk.start_application
+      data: { application: com.spotify.music }
+      target: { device_id: YOUR_TABLET_DEVICE_ID }
+```
 
 ### Actions
 
