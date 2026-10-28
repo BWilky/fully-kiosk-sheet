@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2 — 2026-10-28
+
+- Dashboards running inside Fully Kiosk slowed right down: every chip read the whole Fully
+  JavaScript interface (13 synchronous Android bridge calls) on every Home Assistant state
+  update. Bridge reads are now cached for 2 s and the chips only need three of them.
+- Chips, the chips row and the button skip re-rendering when nothing they show has changed,
+  instead of re-rendering on every state change anywhere in the house.
+- The sheet's icons are pre-warmed while the dashboard is idle, so the first open no longer
+  waits on icon downloads.
+- Test harness: an inside-Fully load test counts bridge calls and renders.
+
 ## 1.0.1 — 2026-10-28
 
 - History stayed blank when the sheet was opened straight into it (history chip, hash route,

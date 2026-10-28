@@ -15,10 +15,18 @@
     connectedCallback() {
       super.connectedCallback();
       if (!local.ok) return;
-      this._snap = local.snap();
-      this._poll = setInterval(() => { if (!document.hidden) this._snap = local.snap(); }, 5000);
+      this._snap = local.snap(0);
+      this._poll = setInterval(() => { if (!document.hidden) this._snap = local.snap(0); }, 5000);
     }
     disconnectedCallback() { clearInterval(this._poll); super.disconnectedCallback(); }
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass")) {
+        const sig = sigOf(this.hass, this._tablet());
+        if (sig === this._sig) return false;
+        this._sig = sig;
+      }
+      return true;
+    }
     firstUpdated() {
       gestures(this.renderRoot.querySelector("ha-card"), {
         onTap: () => { if (!allowedHere(this.hass)) return; haptic("light"); if (!runAction(this, this.hass, this._config.tap_action, this._tablet())) this._open(); },
@@ -117,6 +125,16 @@
       if (local.ok) this._poll = setInterval(() => { if (!document.hidden) this._tick = Date.now(); }, 5000);
     }
     disconnectedCallback() { clearInterval(this._poll); super.disconnectedCallback(); }
+    /* HA hands every card a new hass on every state change anywhere in the house; only re-render
+       when something this chip shows has changed. */
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass")) {
+        const sig = sigOf(this.hass, this._tablet());
+        if (sig === this._sig) return false;
+        this._sig = sig;
+      }
+      return true;
+    }
     firstUpdated() {
       gestures(this.renderRoot.querySelector(".chip"), {
         onTap: () => this._tap(),
@@ -292,10 +310,17 @@
         return el;
       });
     }
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass") && this._els) {
+        this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
+        return false;
+      }
+      return true;
+    }
     render() {
       if (!this._config) return html``;
       if (!this._els) this._buildChips();
-      this._els.forEach((el) => { if ("hass" in el || el.localName === "fully-tablet-chip") el.hass = this.hass; });
+      this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
       return html`<div class="row ${this._config.alignment || "start"}">${this._els}</div>`;
     }
     static get styles() {
@@ -316,6 +341,28 @@
   add("fully-tablet-sheet-button", "Fully tablet sheet button", "Tile that opens the Fully Kiosk tablet sheet: screens, brightness, restarts, history.");
   add("fully-tablet-chips", "Fully tablet chips", "A row of Mushroom-style chips for a Fully Kiosk tablet: status, screen, battery, history, app launchers.");
   add("fully-tablet-chip", "Fully tablet chip", "One chip for a Fully Kiosk tablet. Also usable inside mushroom-chips-card as type: custom:fully-tablet-chip.");
+
+  /* Warm HA's icon cache while the dashboard is idle, so the first open of the sheet doesn't
+     wait on a dozen icon-chunk fetches (noticeable on tablets whose web storage gets cleared). */
+  const ICONS = ["mdi:tablet", "mdi:tablet-dashboard", "mdi:tablet-cellphone", "mdi:tablet-off", "mdi:monitor", "mdi:monitor-off",
+    "mdi:battery", "mdi:battery-charging-100", "mdi:battery-charging-60", "mdi:battery-60", "mdi:battery-unknown", "mdi:battery-charging",
+    "mdi:battery-medium", "mdi:battery-heart-variant", "mdi:lightning-bolt", "mdi:power-plug", "mdi:power-plug-off", "mdi:power-plug-outline",
+    "mdi:power-cycle", "mdi:refresh", "mdi:restart", "mdi:broom", "mdi:flip-to-front", "mdi:flip-to-back", "mdi:wifi", "mdi:wifi-refresh",
+    "mdi:cellphone-screenshot", "mdi:image-off-outline", "mdi:web", "mdi:brightness-5", "mdi:brightness-7", "mdi:volume-low", "mdi:volume-high",
+    "mdi:chart-timeline-variant", "mdi:tune-variant", "mdi:format-list-bulleted", "mdi:gesture-tap", "mdi:lan-disconnect", "mdi:map-marker",
+    "mdi:view-grid-outline", "mdi:close", "mdi:loading", "mdi:information-outline", "mdi:chevron-down", "mdi:alert", "mdi:alert-circle-outline",
+    "mdi:spotify", "mdi:television-play", "mdi:application-outline", "mdi:home-outline", "mdi:cog-outline"];
+  const warmIcons = () => {
+    if (!customElements.get("ha-icon") || document.hidden) return;
+    const box = document.createElement("div");
+    box.setAttribute("aria-hidden", "true");
+    box.style.cssText = "position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none";
+    for (const icon of ICONS) { const el = document.createElement("ha-icon"); el.icon = icon; box.appendChild(el); }
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 15000);
+  };
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
+  setTimeout(() => idle(warmIcons, { timeout: 10000 }), 6000);
 
   console.info(`%c FULLY-TABLET-SHEET %c v${VERSION} `,
     "background:#3d6fb6;color:#fff;border-radius:4px 0 0 4px;padding:2px 6px",

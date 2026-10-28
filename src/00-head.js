@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -255,7 +255,24 @@
       if (!this.has(name)) return undefined;
       try { return window.fully[name](...args); } catch (err) { console.warn(TAG, `fully.${name}() failed`, err); return undefined; }
     },
-    snap() {
+    /* Every window.fully call is a synchronous hop into Android (slow, and it blocks the
+       dashboard), so snapshots are cached: snap() is the full set, lite() the three values the
+       chips need. Both return the cached copy while it is younger than maxAgeMs. */
+    snap(maxAgeMs = 2000) {
+      const now = Date.now();
+      if (this._snap && now - this._snapAt < maxAgeMs) return this._snap;
+      this._snapAt = now;
+      return (this._snap = this._read());
+    },
+    lite(maxAgeMs = 2000) {
+      const now = Date.now();
+      if (this._snap && now - this._snapAt < maxAgeMs) return this._snap;
+      if (this._lite && now - this._liteAt < maxAgeMs) return this._lite;
+      this._liteAt = now;
+      return (this._lite = { battery: this.call("getBatteryLevel"), plugged: this.call("isPlugged"), screenOn: this.call("getScreenOn") });
+    },
+    invalidate() { this._snapAt = 0; this._liteAt = 0; },
+    _read() {
       return {
         battery: this.call("getBatteryLevel"),
         plugged: this.call("isPlugged"),

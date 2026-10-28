@@ -3,13 +3,13 @@ import path from "node:path";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const browser = await chromium.launch();
 const errors = [];
-async function page(width, height, prefixes = ["tabletkitchen"], light = false) {
+async function page(width, height, prefixes = ["tabletkitchen"], light = false, fakeFully = false) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   p.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`[${m.type()}] ${m.text()}`); });
   p.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}`));
-  await p.addInitScript((pre) => { window.__prefixes = pre; }, prefixes);
-  await p.goto("http://127.0.0.1:8765/harness.html");
+  await p.addInitScript(({ pre, ff }) => { window.__prefixes = pre; window.__fakeFully = ff; }, { pre: prefixes, ff: fakeFully });
+  await p.goto("http://127.0.0.1:8765/test/harness.html");
   await p.waitForFunction(() => window.__ready && window.fullyTabletSheet, null, { timeout: 8000 }).catch(() => { console.log("LOAD FAILED", errors.join("\n")); process.exit(1); });
   if (light) await p.evaluate(() => document.body.classList.add("light"));
   return p;
@@ -103,7 +103,38 @@ await p.waitForTimeout(700);
 await shot(p, "12-sheet-3-offline");
 await p.context().close();
 
+// 5. inside Fully: 300 hass updates that change nothing the chips show must cost almost no bridge calls or renders
+p = await page(1280, 800, ["tabletkitchen"], false, true);
+await addCards(p);
+await p.waitForTimeout(600);
+const perf = await p.evaluate(async () => {
+  const chips = document.querySelector("fully-tablet-chips");
+  const els = [...chips.renderRoot.querySelectorAll("fully-tablet-chip")];
+  const btn = document.querySelector("fully-tablet-sheet-button");
+  let renders = 0;
+  for (const el of [...els, btn]) { const orig = el.render.bind(el); el.render = () => { renders++; return orig(); }; }
+  const before = window.__bridgeCalls;
+  const t0 = performance.now();
+  for (let i = 0; i < 300; i++) {
+    const h = { ...window.__hass, states: { ...window.__hass.states } };
+    h.states["sensor.unrelated"] = { entity_id: "sensor.unrelated", state: String(i), attributes: {}, last_updated: new Date().toISOString() };
+    chips.hass = h; btn.hass = h;
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  const ms = performance.now() - t0;
+  // now a real change: battery sensor updates -> chips must re-render
+  const h = { ...window.__hass, states: { ...window.__hass.states } };
+  h.states["sensor.tabletkitchen_battery"] = { ...h.states["sensor.tabletkitchen_battery"], state: "42", last_updated: new Date().toISOString() };
+  const r0 = renders;
+  chips.hass = h; btn.hass = h;
+  await new Promise((r) => setTimeout(r, 50));
+  return { bridgeCalls: window.__bridgeCalls - before, renders, rendersAfterRealChange: renders - r0, ms: Math.round(ms), localTab: window.fullyTabletSheet.tablets()[0]?.key, text: els[0].renderRoot.querySelector(".tx")?.textContent };
+});
+await shot(p, "13-inside-fully");
+await p.context().close();
+
 await browser.close();
+console.log("inside Fully, 300 unrelated hass updates:", JSON.stringify(perf));
 console.log("service calls after restart confirm:", JSON.stringify(calls1));
 console.log("service calls after chips:", JSON.stringify(calls2));
 console.log("hash route opened:", hashOpened, "hash after close:", JSON.stringify(hashAfter));

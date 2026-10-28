@@ -29,6 +29,16 @@ class HaPanelLovelace extends LitElement { render() { return html``; } }
 customElements.define("ha-panel-lovelace", HaPanelLovelace);
 
 const P = window.__prefixes || ["tabletkitchen"];
+if (window.__fakeFully) {
+  // Counts every bridge call, like a real Fully Kiosk JavaScript interface would cost one Android hop.
+  window.__bridgeCalls = 0;
+  const v = { getBatteryLevel: 61, isPlugged: true, getScreenBrightness: 180, getScreenOn: true, getAudioVolume: 40, getIp4Address: "192.168.1.50",
+    getDeviceModel: "TB361FU", getAndroidVersion: "16", getFullyVersion: "1.60", getWifiSsid: "Fairwater", getWifiSignalLevel: -55,
+    getInternalStorageFreeSpace: 1e11, getInternalStorageTotalSpace: 1.28e11, getMacAddress: "14:05:89:a1:82:a0", getDeviceId: "id-tabletkitchen", getDeviceName: "Kitchen" };
+  window.fully = {};
+  for (const [k, val] of Object.entries(v)) window.fully[k] = () => { window.__bridgeCalls++; return val; };
+  for (const k of ["bind", "turnScreenOn", "turnScreenOff", "setScreenBrightness", "startApplication", "loadStartUrl", "clearCache", "restartApp", "reboot", "bringToForeground", "bringToBackground", "enableWifi", "disableWifi", "setAudioVolume"]) window.fully[k] = () => { window.__bridgeCalls++; };
+}
 const states = {}, entities = {}, devices = {};
 const mk = (id, state, attributes = {}) => { states[id] = { entity_id: id, state, attributes, last_changed: new Date().toISOString() }; };
 P.forEach((p, i) => {

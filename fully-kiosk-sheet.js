@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -255,7 +255,24 @@
       if (!this.has(name)) return undefined;
       try { return window.fully[name](...args); } catch (err) { console.warn(TAG, `fully.${name}() failed`, err); return undefined; }
     },
-    snap() {
+    /* Every window.fully call is a synchronous hop into Android (slow, and it blocks the
+       dashboard), so snapshots are cached: snap() is the full set, lite() the three values the
+       chips need. Both return the cached copy while it is younger than maxAgeMs. */
+    snap(maxAgeMs = 2000) {
+      const now = Date.now();
+      if (this._snap && now - this._snapAt < maxAgeMs) return this._snap;
+      this._snapAt = now;
+      return (this._snap = this._read());
+    },
+    lite(maxAgeMs = 2000) {
+      const now = Date.now();
+      if (this._snap && now - this._snapAt < maxAgeMs) return this._snap;
+      if (this._lite && now - this._liteAt < maxAgeMs) return this._lite;
+      this._liteAt = now;
+      return (this._lite = { battery: this.call("getBatteryLevel"), plugged: this.call("isPlugged"), screenOn: this.call("getScreenOn") });
+    },
+    invalidate() { this._snapAt = 0; this._liteAt = 0; },
+    _read() {
       return {
         battery: this.call("getBatteryLevel"),
         plugged: this.call("isPlugged"),
@@ -522,7 +539,7 @@
       this._shotAt = null;
       this._ovTs = Date.now();
       this._ovAt = Date.now();
-      this._snap = local.ok ? local.snap() : null;
+      this._snap = local.ok ? local.snap(0) : null;
       this._hist = null;
       this._range = settings.historyHours;
       this._hover = null;
@@ -562,7 +579,7 @@
       this._tick = setInterval(() => {
         n++;
         if (document.hidden || this._closing) return;
-        if (local.ok && n % LOCAL_POLL_S === 0) this._snap = local.snap();
+        if (local.ok && n % LOCAL_POLL_S === 0) this._snap = local.snap(0);
         if (n % 5 === 0) this.requestUpdate();
         if (n % settings.shotEveryS === 0 && !this._confirm && this._page === "controls") {
           if (this._tab === OVERVIEW) { this._ovTs = Date.now(); this._ovAt = Date.now(); }
@@ -583,7 +600,7 @@
       this._mq.addEventListener?.("change", this._onMq);
       if (local.ok) {
         local.bindEvents();
-        this._onLocal = () => (this._snap = local.snap());
+        this._onLocal = () => (this._snap = local.snap(0));
         window.addEventListener("fts-local", this._onLocal);
       }
       this._onBms = () => this.requestUpdate();
@@ -795,7 +812,7 @@
     }
 
     /* ---------- local (native) actions ---------- */
-    _snapSoon() { setTimeout(() => (this._snap = local.snap()), 300); }
+    _snapSoon() { setTimeout(() => (this._snap = local.snap(0)), 300); }
     _localDo(t, fn, doneMsg, feel = true, ...args) {
       if (!local.has(fn)) { haptic("failure"); this._toast("Fully doesn't allow that on this tablet"); return; }
       if (feel) haptic("light");
@@ -2230,11 +2247,20 @@
     const lk = resolveLocal(hass);
     return (lk && findTablet(hass, lk)) || tabletsOf(hass)[0] || null;
   };
+  /* Cheap fingerprint of what a chip or button shows; identical => skip the re-render. */
+  const sigOf = (hass, t) => {
+    if (!hass || !t) return "none";
+    const I = ids(t.prefix);
+    const s = hass.states || {};
+    const l = t.key === resolveLocal(hass) && local.ok ? local.lite() : null;
+    return [I.screen, I.battery, I.plugged, I.fg, t.plug].map((id) => (id && s[id]) ? `${s[id].state}@${s[id].last_updated}` : "-")
+      .concat(l ? [`${l.battery}/${l.plugged}/${l.screenOn}`] : []).join("|");
+  };
   const stateOf = (hass, t) => {
     const I = ids(t.prefix);
     const lk = resolveLocal(hass);
     const me = t.key === lk && local.ok;
-    const snap = me ? local.snap() : null;
+    const snap = me ? local.lite() : null;
     const scr = hass.states?.[I.screen];
     const online = me ? true : !!scr && !DEAD.includes(scr.state);
     const on = me ? snap?.screenOn !== false : scr?.state === "on";
@@ -2260,10 +2286,18 @@
     connectedCallback() {
       super.connectedCallback();
       if (!local.ok) return;
-      this._snap = local.snap();
-      this._poll = setInterval(() => { if (!document.hidden) this._snap = local.snap(); }, 5000);
+      this._snap = local.snap(0);
+      this._poll = setInterval(() => { if (!document.hidden) this._snap = local.snap(0); }, 5000);
     }
     disconnectedCallback() { clearInterval(this._poll); super.disconnectedCallback(); }
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass")) {
+        const sig = sigOf(this.hass, this._tablet());
+        if (sig === this._sig) return false;
+        this._sig = sig;
+      }
+      return true;
+    }
     firstUpdated() {
       gestures(this.renderRoot.querySelector("ha-card"), {
         onTap: () => { if (!allowedHere(this.hass)) return; haptic("light"); if (!runAction(this, this.hass, this._config.tap_action, this._tablet())) this._open(); },
@@ -2362,6 +2396,16 @@
       if (local.ok) this._poll = setInterval(() => { if (!document.hidden) this._tick = Date.now(); }, 5000);
     }
     disconnectedCallback() { clearInterval(this._poll); super.disconnectedCallback(); }
+    /* HA hands every card a new hass on every state change anywhere in the house; only re-render
+       when something this chip shows has changed. */
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass")) {
+        const sig = sigOf(this.hass, this._tablet());
+        if (sig === this._sig) return false;
+        this._sig = sig;
+      }
+      return true;
+    }
     firstUpdated() {
       gestures(this.renderRoot.querySelector(".chip"), {
         onTap: () => this._tap(),
@@ -2537,10 +2581,17 @@
         return el;
       });
     }
+    shouldUpdate(changed) {
+      if (changed.size === 1 && changed.has("hass") && this._els) {
+        this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
+        return false;
+      }
+      return true;
+    }
     render() {
       if (!this._config) return html``;
       if (!this._els) this._buildChips();
-      this._els.forEach((el) => { if ("hass" in el || el.localName === "fully-tablet-chip") el.hass = this.hass; });
+      this._els.forEach((el) => { if (el.localName === "fully-tablet-chip") el.hass = this.hass; });
       return html`<div class="row ${this._config.alignment || "start"}">${this._els}</div>`;
     }
     static get styles() {
@@ -2561,6 +2612,28 @@
   add("fully-tablet-sheet-button", "Fully tablet sheet button", "Tile that opens the Fully Kiosk tablet sheet: screens, brightness, restarts, history.");
   add("fully-tablet-chips", "Fully tablet chips", "A row of Mushroom-style chips for a Fully Kiosk tablet: status, screen, battery, history, app launchers.");
   add("fully-tablet-chip", "Fully tablet chip", "One chip for a Fully Kiosk tablet. Also usable inside mushroom-chips-card as type: custom:fully-tablet-chip.");
+
+  /* Warm HA's icon cache while the dashboard is idle, so the first open of the sheet doesn't
+     wait on a dozen icon-chunk fetches (noticeable on tablets whose web storage gets cleared). */
+  const ICONS = ["mdi:tablet", "mdi:tablet-dashboard", "mdi:tablet-cellphone", "mdi:tablet-off", "mdi:monitor", "mdi:monitor-off",
+    "mdi:battery", "mdi:battery-charging-100", "mdi:battery-charging-60", "mdi:battery-60", "mdi:battery-unknown", "mdi:battery-charging",
+    "mdi:battery-medium", "mdi:battery-heart-variant", "mdi:lightning-bolt", "mdi:power-plug", "mdi:power-plug-off", "mdi:power-plug-outline",
+    "mdi:power-cycle", "mdi:refresh", "mdi:restart", "mdi:broom", "mdi:flip-to-front", "mdi:flip-to-back", "mdi:wifi", "mdi:wifi-refresh",
+    "mdi:cellphone-screenshot", "mdi:image-off-outline", "mdi:web", "mdi:brightness-5", "mdi:brightness-7", "mdi:volume-low", "mdi:volume-high",
+    "mdi:chart-timeline-variant", "mdi:tune-variant", "mdi:format-list-bulleted", "mdi:gesture-tap", "mdi:lan-disconnect", "mdi:map-marker",
+    "mdi:view-grid-outline", "mdi:close", "mdi:loading", "mdi:information-outline", "mdi:chevron-down", "mdi:alert", "mdi:alert-circle-outline",
+    "mdi:spotify", "mdi:television-play", "mdi:application-outline", "mdi:home-outline", "mdi:cog-outline"];
+  const warmIcons = () => {
+    if (!customElements.get("ha-icon") || document.hidden) return;
+    const box = document.createElement("div");
+    box.setAttribute("aria-hidden", "true");
+    box.style.cssText = "position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none";
+    for (const icon of ICONS) { const el = document.createElement("ha-icon"); el.icon = icon; box.appendChild(el); }
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 15000);
+  };
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
+  setTimeout(() => idle(warmIcons, { timeout: 10000 }), 6000);
 
   console.info(`%c FULLY-TABLET-SHEET %c v${VERSION} `,
     "background:#3d6fb6;color:#fff;border-radius:4px 0 0 4px;padding:2px 6px",

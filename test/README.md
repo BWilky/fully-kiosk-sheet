@@ -6,6 +6,10 @@ in phone and desktop layouts, the History page and the hash routes, then screens
 
 ```bash
 cd test && npm install lit@3 playwright
-npx http-server -p 8765 -s . &
+(cd .. && npx http-server -p 8765 -s .) &
 node run.mjs          # screenshots land in test/shots/, console errors are listed at the end
 ```
+
+With a global Playwright install, `NODE_PATH=$(npm root -g) node run.mjs`. The last scenario fakes
+`window.fully` and feeds the chips 300 unrelated state updates: the bridge-call count must stay
+near zero.

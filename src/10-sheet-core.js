@@ -148,7 +148,7 @@
       this._shotAt = null;
       this._ovTs = Date.now();
       this._ovAt = Date.now();
-      this._snap = local.ok ? local.snap() : null;
+      this._snap = local.ok ? local.snap(0) : null;
       this._hist = null;
       this._range = settings.historyHours;
       this._hover = null;
@@ -188,7 +188,7 @@
       this._tick = setInterval(() => {
         n++;
         if (document.hidden || this._closing) return;
-        if (local.ok && n % LOCAL_POLL_S === 0) this._snap = local.snap();
+        if (local.ok && n % LOCAL_POLL_S === 0) this._snap = local.snap(0);
         if (n % 5 === 0) this.requestUpdate();
         if (n % settings.shotEveryS === 0 && !this._confirm && this._page === "controls") {
           if (this._tab === OVERVIEW) { this._ovTs = Date.now(); this._ovAt = Date.now(); }
@@ -209,7 +209,7 @@
       this._mq.addEventListener?.("change", this._onMq);
       if (local.ok) {
         local.bindEvents();
-        this._onLocal = () => (this._snap = local.snap());
+        this._onLocal = () => (this._snap = local.snap(0));
         window.addEventListener("fts-local", this._onLocal);
       }
       this._onBms = () => this.requestUpdate();
@@ -421,7 +421,7 @@
     }
 
     /* ---------- local (native) actions ---------- */
-    _snapSoon() { setTimeout(() => (this._snap = local.snap()), 300); }
+    _snapSoon() { setTimeout(() => (this._snap = local.snap(0)), 300); }
     _localDo(t, fn, doneMsg, feel = true, ...args) {
       if (!local.has(fn)) { haptic("failure"); this._toast("Fully doesn't allow that on this tablet"); return; }
       if (feel) haptic("light");

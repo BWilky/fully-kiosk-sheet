@@ -136,11 +136,20 @@
     const lk = resolveLocal(hass);
     return (lk && findTablet(hass, lk)) || tabletsOf(hass)[0] || null;
   };
+  /* Cheap fingerprint of what a chip or button shows; identical => skip the re-render. */
+  const sigOf = (hass, t) => {
+    if (!hass || !t) return "none";
+    const I = ids(t.prefix);
+    const s = hass.states || {};
+    const l = t.key === resolveLocal(hass) && local.ok ? local.lite() : null;
+    return [I.screen, I.battery, I.plugged, I.fg, t.plug].map((id) => (id && s[id]) ? `${s[id].state}@${s[id].last_updated}` : "-")
+      .concat(l ? [`${l.battery}/${l.plugged}/${l.screenOn}`] : []).join("|");
+  };
   const stateOf = (hass, t) => {
     const I = ids(t.prefix);
     const lk = resolveLocal(hass);
     const me = t.key === lk && local.ok;
-    const snap = me ? local.snap() : null;
+    const snap = me ? local.lite() : null;
     const scr = hass.states?.[I.screen];
     const online = me ? true : !!scr && !DEAD.includes(scr.state);
     const on = me ? snap?.screenOn !== false : scr?.state === "on";
