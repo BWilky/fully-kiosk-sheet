@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.5 — 2026-10-29
+
+- Chips created by Mushroom's chips card before this module had loaded never reacted to taps on
+  WebKit (iOS Companion app, Safari): their first render ran before `setConfig`, so the gesture
+  handlers were bound to nothing. Handlers are now bound after whichever render first produces
+  the chip; the button card gets the same treatment.
+- `debug: true` on a chip shows the build and the last gesture step on the chip itself, and
+  writes each step to the logbook.
+
 ## 1.1.2 — 2026-10-29
 
 - Taps on chips and the button did nothing on touch screens: pointerleave fires between

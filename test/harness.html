@@ -95,6 +95,15 @@ const hass = {
 };
 document.querySelector("home-assistant").hass = hass;
 window.__hass = hass;
+if (window.__late) {
+  // Mushroom's createChipElement: element first, hass set by the card, setConfig after the definition lands.
+  const box = document.createElement("div"); box.id = "late"; box.style.cssText = "display:flex;gap:8px;--chip-height:36px";
+  const el = document.createElement("mushroom-fully-tablet-chip");
+  const cfg = { type: "fully-tablet", chip: "status", debug: true, tablets: [{ name: "Kitchen", prefix: "tabletkitchen" }] };
+  box.appendChild(el); document.getElementById("stage").appendChild(box);
+  el.hass = hass;
+  customElements.whenDefined("mushroom-fully-tablet-chip").then(() => { customElements.upgrade(el); el.setConfig(cfg); el.hass = hass; window.__lateConfigured = true; });
+}
 window.__ready = true;
 </script>
 <script type="module" src="../fully-kiosk-sheet.js"></script>

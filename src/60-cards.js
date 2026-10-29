@@ -27,8 +27,14 @@
       }
       return true;
     }
-    firstUpdated() {
-      gestures(this.renderRoot.querySelector("ha-card"), {
+    /* Bound after any render that produced the card (the first render can be empty when the
+       element was created before this module loaded, as Mushroom's chips card does). */
+    updated(changed) {
+      super.updated?.(changed);
+      const host = this.renderRoot?.querySelector("ha-card");
+      if (!host || this._bound === host) return;
+      this._bound = host;
+      gestures(host, {
         onTap: () => { if (!allowedHere(this.hass)) return; haptic("light"); if (!runAction(this, this.hass, this._config.tap_action, this._tablet())) this._open(); },
         onHold: () => { if (!allowedHere(this.hass)) return false; return runAction(this, this.hass, this._config.hold_action, this._tablet()) || (this._open("history"), true); },
       });
@@ -135,9 +141,12 @@
       }
       return true;
     }
-    firstUpdated() {
-      const host = this.renderRoot.querySelector(".chip");
-      debugLog(this.hass, `chip ${this._config?.chip} ready host=${!!host} tag=${this.localName} ua=${navigator.userAgent.slice(0, 60)}`);
+    updated(changed) {
+      super.updated?.(changed);
+      const host = this.renderRoot?.querySelector(".chip");
+      if (!host || this._bound === host) return;
+      this._bound = host;
+      debugLog(this.hass, `chip ${this._config?.chip} bound tag=${this.localName} ua=${navigator.userAgent.slice(0, 60)}`);
       gestures(host, {
         onTap: () => this._tap(),
         onHold: () => this._hold(),
