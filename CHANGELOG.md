@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 — 2026-10-29
+
+- Taps on chips and the button did nothing on touch screens: pointerleave fires between
+  pointerup and click there, and the gesture handler took it for a cancelled press.
+
 ## 1.1.1 — 2026-10-29
 
 - Chips inside a Mushroom chips card were tiny and oversized at once: Mushroom sizes its chips in

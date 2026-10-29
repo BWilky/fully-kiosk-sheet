@@ -3,8 +3,8 @@ import path from "node:path";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const browser = await chromium.launch();
 const errors = [];
-async function page(width, height, prefixes = ["tabletkitchen"], light = false, fakeFully = false) {
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+async function page(width, height, prefixes = ["tabletkitchen"], light = false, fakeFully = false, touch = false) {
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch });
   const p = await ctx.newPage();
   p.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`[${m.type()}] ${m.text()}`); });
   p.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}`));
@@ -73,11 +73,23 @@ await p.waitForTimeout(400);
 const hashAfter = await p.evaluate(() => location.hash);
 await p.context().close();
 
-// 2. phone, single tablet
-p = await page(390, 844);
+// 2. phone with a touch screen, single tablet — a real finger tap on the history chip must open a fresh sheet into History
+p = await page(390, 844, ["tabletkitchen"], false, false, true);
 await addCards(p);
 await p.waitForTimeout(400);
 await shot(p, "06-cards-phone");
+await p.locator("#chips > *").nth(3).locator(".chip").tap();
+await p.waitForTimeout(900);
+const directHistory = await p.evaluate(() => { const s = document.querySelector("fully-tablet-sheet"); return s ? `${s._tab}/${s._page}/${s._hist?.data ? "data" : s._hist ? "nodata" : "nohist"}/${s.renderRoot.querySelectorAll(".log-list li").length}` : "none"; });
+await shot(p, "06b-direct-history");
+await p.evaluate(() => document.querySelector("fully-tablet-sheet")?.close());
+await p.waitForTimeout(400);
+// a tap on the button card too (same gesture code), then close it
+await p.locator("fully-tablet-sheet-button").locator("ha-card").tap();
+await p.waitForTimeout(500);
+const buttonTap = await p.evaluate(() => !!document.querySelector("fully-tablet-sheet"));
+await p.evaluate(() => document.querySelector("fully-tablet-sheet")?.close());
+await p.waitForTimeout(400);
 await p.evaluate(() => window.openTabletSheet());
 await p.waitForTimeout(700);
 await shot(p, "07-sheet-controls");
@@ -143,4 +155,5 @@ console.log("inside Fully, 300 unrelated hass updates:", JSON.stringify(perf));
 console.log("service calls after restart confirm:", JSON.stringify(calls1));
 console.log("service calls after chips:", JSON.stringify(calls2));
 console.log("hash route opened:", hashOpened, "hash after close:", JSON.stringify(hashAfter));
+console.log("touch tap on history chip -> tab/page/data/log rows:", directHistory, "| touch tap on button opened sheet:", buttonTap);
 console.log("console errors/warnings:", errors.length ? "\n" + errors.join("\n") : "none");

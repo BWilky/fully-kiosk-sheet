@@ -97,19 +97,21 @@
     return false;
   };
 
-  /* Tap / hold / double-tap without pulling in HA's action handler */
+  /* Tap / hold / double-tap without pulling in HA's action handler.
+     On touch screens pointerleave fires between pointerup and click, so leaving/cancelling only
+     stops the hold timer; a click is swallowed only when the hold actually fired. */
   const gestures = (host, { onTap, onHold, onDouble }) => {
     let holdT = null, held = false, lastTap = 0, dblT = null;
+    const stop = () => { clearTimeout(holdT); holdT = null; };
     const down = (e) => {
       if (e.button != null && e.button !== 0) return;
       held = false;
-      clearTimeout(holdT);
-      holdT = setTimeout(() => { held = true; if (onHold?.()) haptic("medium"); }, 500);
+      stop();
+      holdT = setTimeout(() => { holdT = null; held = true; if (onHold?.()) haptic("medium"); }, 500);
     };
-    const up = () => { clearTimeout(holdT); };
-    const cancel = () => { clearTimeout(holdT); held = true; };
     const click = (e) => {
-      if (held) { held = false; e.preventDefault(); return; }
+      stop();
+      if (held) { held = false; e.preventDefault(); e.stopPropagation(); return; }
       if (onDouble) {
         const now = Date.now();
         if (now - lastTap < 250) { clearTimeout(dblT); lastTap = 0; onDouble(); return; }
@@ -121,9 +123,9 @@
       onTap?.();
     };
     host.addEventListener("pointerdown", down);
-    host.addEventListener("pointerup", up);
-    host.addEventListener("pointercancel", cancel);
-    host.addEventListener("pointerleave", cancel);
+    host.addEventListener("pointerup", stop);
+    host.addEventListener("pointercancel", stop);
+    host.addEventListener("pointerleave", stop);
     host.addEventListener("click", click);
     host.addEventListener("contextmenu", (e) => { if (onHold) e.preventDefault(); });
     host.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap?.(); } });
