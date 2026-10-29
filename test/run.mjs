@@ -20,9 +20,9 @@ const addCards = async (p) => p.evaluate(() => {
   // A Mushroom-style chips row: Mushroom creates <mushroom-${type}-chip> for every chip and sets hass on each.
   const chips = document.createElement("div");
   chips.id = "chips";
-  chips.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
+  chips.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;--chip-height:36px;--chip-icon-size:0.5em;--chip-font-size:0.3em;--chip-font-weight:bold;--chip-padding:0 0.25em;--chip-border-radius:19px";
   const defs = [{ type: "fully-tablet", chip: "status", tablets: [{ name: "Kitchen", prefix: "tabletkitchen", plug: "switch.kitchen_tablet_plug" }] }, { type: "fully-tablet-screen" }, { type: "fully-tablet", chip: "battery" },
-    { type: "fully-tablet-history" }, { type: "fully-tablet-app", app_package: "com.spotify.music" }, { type: "fully-tablet", chip: "app", app_package: "com.disney.disneyplus", name: "Disney+" }, { type: "fully-tablet-charger" }, { type: "fully-tablet-open" }];
+    { type: "fully-tablet-history" }, { type: "fully-tablet-app", app_package: "com.spotify.music" }, { type: "fully-tablet", chip: "app", app_package: "com.disney.disneyplus", name: "Disney+" }, { type: "fully-tablet-charger" }, { type: "fully-tablet-open" }, { type: "fully-tablet", chip: "status", icon_only: true }];
   for (const cfg of defs) { const el = document.createElement(`mushroom-${cfg.type}-chip`); el.setConfig(cfg); el.hass = window.__hass; chips.appendChild(el); }
   const btn = document.createElement("fully-tablet-sheet-button");
   btn.setConfig({ title: "Tablet Controls", tablets: [{ name: "Kitchen", prefix: "tabletkitchen", plug: "switch.kitchen_tablet_plug" }] });

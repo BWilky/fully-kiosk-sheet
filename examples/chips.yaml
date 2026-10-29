@@ -24,6 +24,9 @@ chips:
   - type: fully-tablet-history
   - type: fully-tablet-open      # plain "Tablets" opener (Overview when there are several)
     name: Tablets
+  - type: fully-tablet           # icon-only variant for a crowded phone row
+    chip: status
+    icon_only: true
 
 # The same chip as a card of its own, in a sections grid:
 # type: custom:fully-tablet-chip

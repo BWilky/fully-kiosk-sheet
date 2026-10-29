@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 — 2026-10-29
+
+- Chips inside a Mushroom chips card were tiny and oversized at once: Mushroom sizes its chips in
+  em of the chip height, and the chip inherited those variables against a 14 px font. The chip now
+  uses Mushroom's exact sizing model (36 px, 0.5em icon, 0.3em text, 0.25em padding).
+- `icon_only: true` for a round 36 px chip.
+
 ## 1.1.0 — 2026-10-29
 
 - The `fully-tablet-chips` row card is gone. Chips live inside Mushroom's chips card instead:

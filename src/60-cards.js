@@ -242,30 +242,35 @@
         }
         default: icon = icon || "mdi:tablet-dashboard"; text = text ?? (c.name || "Tablets"); color = color || "blue";
       }
+      if (c.icon_only) text = "";
       const rgb = rgbOf(color);
       const style = rgb ? `--chip-icon-rgb:${rgb};` : "";
       return html`
-        <div class="chip ${tone} ${this._busy ? "busy" : ""} ${text ? "" : "icon-only"}" style=${style} role="button" tabindex="0" aria-label=${text || c.chip}>
+        <div class="chip ${tone} ${this._busy ? "busy" : ""} ${text ? "" : "icon-only"}" style=${style} role="button" tabindex="0" aria-label=${text || c.name || c.chip}>
           <span class="ic"><ha-icon .icon=${this._busy ? "mdi:loading" : icon} class=${this._busy ? "spin" : ""}></ha-icon></span>
           ${text ? html`<span class="tx">${text}</span>` : ""}
         </div>`;
     }
 
+    /* Sized exactly like Mushroom's own chip: the chip's font-size is its height, icon and text
+       are em fractions of it, so the --chip-* variables a mushroom-chips-card provides apply as-is. */
     static get styles() {
       return css`
-        :host { display: inline-flex; vertical-align: middle; --chip-h: var(--chip-height, 36px); }
-        .chip { display: inline-flex; align-items: center; gap: 6px; height: var(--chip-h); padding: 0 12px 0 10px; border-radius: var(--chip-border-radius, calc(var(--chip-h) / 2));
+        :host { display: inline-flex; vertical-align: middle; }
+        .chip { box-sizing: content-box; height: var(--chip-height, 36px); min-width: var(--chip-height, 36px); font-size: var(--chip-height, 36px);
+          display: inline-flex; align-items: center; justify-content: center; gap: 0.15em; padding: var(--chip-padding, 0 0.25em);
+          border-radius: var(--chip-border-radius, 19px);
           background: var(--chip-background, var(--ha-card-background, var(--card-background-color, #fff)));
           border: var(--chip-border-width, var(--ha-card-border-width, 1px)) solid var(--chip-border-color, var(--ha-card-border-color, var(--divider-color, rgba(0,0,0,.12))));
-          box-shadow: var(--chip-box-shadow, var(--ha-card-box-shadow, none)); color: var(--primary-text-color);
-          font-size: var(--chip-font-size, 14px); font-weight: var(--chip-font-weight, 500); line-height: 1; white-space: nowrap;
-          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: transform .1s ease, background .15s ease; }
-        .chip.icon-only { padding: 0 10px; }
+          box-shadow: var(--chip-box-shadow, var(--ha-card-box-shadow, none)); color: var(--primary-text-color); line-height: 0;
+          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: transform .1s ease; }
+        .chip.icon-only { padding: 0; }
         .chip:active { transform: scale(.96); }
         .chip:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-        .ic { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: rgb(var(--chip-icon-rgb, var(--rgb-primary-text-color, 33, 33, 33))); }
-        .ic ha-icon { --mdc-icon-size: var(--chip-icon-size, 20px); }
-        .tx { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+        .ic { display: flex; align-items: center; justify-content: center; color: rgb(var(--chip-icon-rgb, var(--rgb-primary-text-color, 33, 33, 33))); }
+        .ic ha-icon { display: flex; --mdc-icon-size: var(--chip-icon-size, 0.5em); }
+        .tx { font-size: var(--chip-font-size, 0.3em); font-weight: var(--chip-font-weight, bold); line-height: 1; white-space: nowrap;
+          max-width: 14em; overflow: hidden; text-overflow: ellipsis; padding-right: 0.1em; }
         .chip.front .tx { color: rgb(var(--chip-icon-rgb)); }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }

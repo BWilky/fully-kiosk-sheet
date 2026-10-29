@@ -81,7 +81,9 @@ icon: mdi:television-play
 ```
 
 Every chip takes `name`, `icon`, `icon_color` (Mushroom colour names, `#hex` or `r, g, b`),
-`content` (override the text), `tablet`, `tap_action` and `hold_action`.
+`content` (override the text), `icon_only: true` (a 36 px round chip, handy on phones), `tablet`,
+`tap_action` and `hold_action`. Sizing follows Mushroom's `--chip-*` variables, so the chips match
+the ones next to them.
 
 Plain Mushroom chips work too, with a hash route or an action; see
 [`examples/mushroom-chips.yaml`](examples/mushroom-chips.yaml):
