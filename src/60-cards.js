@@ -103,7 +103,7 @@
 
   const CHIP_KINDS = ["status", "screen", "battery", "history", "app", "open", "charger"];
   class TabletChip extends Base {
-    static get properties() { return { hass: { attribute: false }, _config: { state: true }, _tick: { state: true }, _busy: { state: true } }; }
+    static get properties() { return { hass: { attribute: false }, _config: { state: true }, _tick: { state: true }, _busy: { state: true }, _dbg: { state: true } }; }
     setConfig(config) {
       const cfg = { chip: "status", ...(config || {}) };
       if (cfg.type && !config?.chip) { // type: custom:fully-tablet-chip-app / fully-tablet-app style aliases
@@ -141,7 +141,7 @@
       gestures(host, {
         onTap: () => this._tap(),
         onHold: () => this._hold(),
-        onEvent: (m) => debugLog(this.hass, `chip ${this._config?.chip}: ${m}`),
+        onEvent: (m) => { this._dbg = m.replace(/pointerdown type=/, "down:").replace(/ button=\d/, "").replace("click held=", "click:"); debugLog(this.hass, `chip ${this._config?.chip}: ${m}`); },
       });
     }
 
@@ -150,6 +150,7 @@
       const t = this._tablet();
       const c = this._config;
       debugLog(this.hass, `chip ${c.chip} tap: tablet=${t?.key || "-"} allowed=${allowedHere(this.hass)} opener=${typeof window.openTabletSheet}`);
+      if (c.debug) { this._dbg = `tap ${t ? t.key : "no tablet"}`; setTimeout(() => { const n = document.querySelectorAll("fully-tablet-sheet").length; this._dbg = n ? `sheet ×${n}` : "no sheet"; }, 400); }
       if (runAction(this, this.hass, c.tap_action, t)) return;
       if (!allowedHere(this.hass) && c.chip !== "app" && c.chip !== "screen") { haptic("failure"); return; }
       haptic("light");
@@ -247,6 +248,7 @@
         default: icon = icon || "mdi:tablet-dashboard"; text = text ?? (c.name || "Tablets"); color = color || "blue";
       }
       if (c.icon_only) text = "";
+      if (c.debug) text = `v${VERSION} ${this._dbg || "ready"}`;
       const rgb = rgbOf(color);
       const style = rgb ? `--chip-icon-rgb:${rgb};` : "";
       return html`

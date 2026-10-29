@@ -1,0 +1,13 @@
+import { chromium } from "/opt/node-tools/node_modules/playwright/index.mjs";
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const p = await ctx.newPage();
+await p.addInitScript(() => { window.__prefixes = ["tabletkitchen"]; });
+await p.goto("http://127.0.0.1:8765/test/harness.html");
+await p.waitForFunction(() => window.__ready && window.fullyTabletSheet);
+await p.evaluate(() => { const el = document.createElement("mushroom-fully-tablet-chip"); el.setConfig({ type: "fully-tablet", chip: "status", icon_only: true, debug: true, tablets: [{ name: "Kitchen", prefix: "tabletkitchen" }] }); el.hass = window.__hass; document.getElementById("stage").append(el); });
+await p.waitForTimeout(300);
+await p.locator("mushroom-fully-tablet-chip .chip").tap();
+await p.waitForTimeout(600);
+console.log(JSON.stringify(await p.evaluate(() => window.__calls.filter((c) => c.d === "logbook").map((c) => c.data.message)), null, 1));
+await browser.close();

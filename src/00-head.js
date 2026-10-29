@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.1.3";
+  const VERSION = "1.1.4";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
