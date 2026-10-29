@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.1.2";
+  const VERSION = "1.1.3";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -87,6 +87,7 @@
     logActions: true,       // write sheet actions to the HA logbook
     historyHours: 24,
     shotEveryS: 15,
+    debug: false,           // write each tap / open step to the HA logbook (troubleshooting)
   };
 
   /* "Galaxy Tab Office" -> "Office", "TabletKitchen" -> "TabletKitchen" */
@@ -125,6 +126,15 @@
     if (typeof cfg.log_actions === "boolean") settings.logActions = cfg.log_actions;
     if (Number.isFinite(Number(cfg.history_hours))) settings.historyHours = Number(cfg.history_hours);
     if (Number.isFinite(Number(cfg.screenshot_seconds))) settings.shotEveryS = Math.max(5, Number(cfg.screenshot_seconds));
+    if (typeof cfg.debug === "boolean") settings.debug = cfg.debug;
+  };
+  /* debug: true on any card -> a line per step in the HA logbook, readable from anywhere */
+  const debugLog = (hass, msg) => {
+    if (!settings.debug) return;
+    const h = hass || getHass();
+    console.info(TAG, msg);
+    if (!h) return;
+    h.callService("logbook", "log", { name: "fully-kiosk-sheet debug", message: String(msg).slice(0, 255) }).catch(() => { /* ignore */ });
   };
 
   /* Discovery: every fully_kiosk device = a switch.<prefix>_screen entity */
@@ -568,6 +578,7 @@
        Idempotent, so it is safe to call this often; it also covers a page set during the first render. */
     updated(changed) {
       super.updated?.(changed);
+      if (!this._loggedFirst && this._tab !== null) { this._loggedFirst = true; debugLog(this.hass, `sheet rendered tab=${this._tab} page=${this._page} layout=${this._dialog ? "dialog" : "sheet"} tablets=${this.tablets.length}`); }
       if (this._page === "history") this._maybeLoadHistory();
     }
 
@@ -2136,6 +2147,7 @@
     }
     document.body.appendChild(el);
     if (tablet || page) el.openTab(tablet, page);
+    debugLog(hass, `sheet appended (tablet=${tablet || "-"} page=${page || "-"}) sheets=${document.querySelectorAll("fully-tablet-sheet").length} w=${window.innerWidth}`);
     return el;
   };
   window.addEventListener("tablet-sheet-open", (e) => window.openTabletSheet(e.detail || {}));
@@ -2211,10 +2223,11 @@
   /* Tap / hold / double-tap without pulling in HA's action handler.
      On touch screens pointerleave fires between pointerup and click, so leaving/cancelling only
      stops the hold timer; a click is swallowed only when the hold actually fired. */
-  const gestures = (host, { onTap, onHold, onDouble }) => {
+  const gestures = (host, { onTap, onHold, onDouble, onEvent }) => {
     let holdT = null, held = false, lastTap = 0, dblT = null;
     const stop = () => { clearTimeout(holdT); holdT = null; };
     const down = (e) => {
+      onEvent?.(`pointerdown type=${e.pointerType} button=${e.button}`);
       if (e.button != null && e.button !== 0) return;
       held = false;
       stop();
@@ -2222,6 +2235,7 @@
     };
     const click = (e) => {
       stop();
+      onEvent?.(`click held=${held}`);
       if (held) { held = false; e.preventDefault(); e.stopPropagation(); return; }
       if (onDouble) {
         const now = Date.now();
@@ -2409,9 +2423,12 @@
       return true;
     }
     firstUpdated() {
-      gestures(this.renderRoot.querySelector(".chip"), {
+      const host = this.renderRoot.querySelector(".chip");
+      debugLog(this.hass, `chip ${this._config?.chip} ready host=${!!host} tag=${this.localName} ua=${navigator.userAgent.slice(0, 60)}`);
+      gestures(host, {
         onTap: () => this._tap(),
         onHold: () => this._hold(),
+        onEvent: (m) => debugLog(this.hass, `chip ${this._config?.chip}: ${m}`),
       });
     }
 
@@ -2419,6 +2436,7 @@
     _tap() {
       const t = this._tablet();
       const c = this._config;
+      debugLog(this.hass, `chip ${c.chip} tap: tablet=${t?.key || "-"} allowed=${allowedHere(this.hass)} opener=${typeof window.openTabletSheet}`);
       if (runAction(this, this.hass, c.tap_action, t)) return;
       if (!allowedHere(this.hass) && c.chip !== "app" && c.chip !== "screen") { haptic("failure"); return; }
       haptic("light");

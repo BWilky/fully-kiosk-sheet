@@ -136,9 +136,12 @@
       return true;
     }
     firstUpdated() {
-      gestures(this.renderRoot.querySelector(".chip"), {
+      const host = this.renderRoot.querySelector(".chip");
+      debugLog(this.hass, `chip ${this._config?.chip} ready host=${!!host} tag=${this.localName} ua=${navigator.userAgent.slice(0, 60)}`);
+      gestures(host, {
         onTap: () => this._tap(),
         onHold: () => this._hold(),
+        onEvent: (m) => debugLog(this.hass, `chip ${this._config?.chip}: ${m}`),
       });
     }
 
@@ -146,6 +149,7 @@
     _tap() {
       const t = this._tablet();
       const c = this._config;
+      debugLog(this.hass, `chip ${c.chip} tap: tablet=${t?.key || "-"} allowed=${allowedHere(this.hass)} opener=${typeof window.openTabletSheet}`);
       if (runAction(this, this.hass, c.tap_action, t)) return;
       if (!allowedHere(this.hass) && c.chip !== "app" && c.chip !== "screen") { haptic("failure"); return; }
       haptic("light");

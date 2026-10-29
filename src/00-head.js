@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.1.2";
+  const VERSION = "1.1.3";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -87,6 +87,7 @@
     logActions: true,       // write sheet actions to the HA logbook
     historyHours: 24,
     shotEveryS: 15,
+    debug: false,           // write each tap / open step to the HA logbook (troubleshooting)
   };
 
   /* "Galaxy Tab Office" -> "Office", "TabletKitchen" -> "TabletKitchen" */
@@ -125,6 +126,15 @@
     if (typeof cfg.log_actions === "boolean") settings.logActions = cfg.log_actions;
     if (Number.isFinite(Number(cfg.history_hours))) settings.historyHours = Number(cfg.history_hours);
     if (Number.isFinite(Number(cfg.screenshot_seconds))) settings.shotEveryS = Math.max(5, Number(cfg.screenshot_seconds));
+    if (typeof cfg.debug === "boolean") settings.debug = cfg.debug;
+  };
+  /* debug: true on any card -> a line per step in the HA logbook, readable from anywhere */
+  const debugLog = (hass, msg) => {
+    if (!settings.debug) return;
+    const h = hass || getHass();
+    console.info(TAG, msg);
+    if (!h) return;
+    h.callService("logbook", "log", { name: "fully-kiosk-sheet debug", message: String(msg).slice(0, 255) }).catch(() => { /* ignore */ });
   };
 
   /* Discovery: every fully_kiosk device = a switch.<prefix>_screen entity */

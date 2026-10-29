@@ -177,6 +177,7 @@
        Idempotent, so it is safe to call this often; it also covers a page set during the first render. */
     updated(changed) {
       super.updated?.(changed);
+      if (!this._loggedFirst && this._tab !== null) { this._loggedFirst = true; debugLog(this.hass, `sheet rendered tab=${this._tab} page=${this._page} layout=${this._dialog ? "dialog" : "sheet"} tablets=${this.tablets.length}`); }
       if (this._page === "history") this._maybeLoadHistory();
     }
 

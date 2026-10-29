@@ -25,6 +25,7 @@
     }
     document.body.appendChild(el);
     if (tablet || page) el.openTab(tablet, page);
+    debugLog(hass, `sheet appended (tablet=${tablet || "-"} page=${page || "-"}) sheets=${document.querySelectorAll("fully-tablet-sheet").length} w=${window.innerWidth}`);
     return el;
   };
   window.addEventListener("tablet-sheet-open", (e) => window.openTabletSheet(e.detail || {}));
@@ -100,10 +101,11 @@
   /* Tap / hold / double-tap without pulling in HA's action handler.
      On touch screens pointerleave fires between pointerup and click, so leaving/cancelling only
      stops the hold timer; a click is swallowed only when the hold actually fired. */
-  const gestures = (host, { onTap, onHold, onDouble }) => {
+  const gestures = (host, { onTap, onHold, onDouble, onEvent }) => {
     let holdT = null, held = false, lastTap = 0, dblT = null;
     const stop = () => { clearTimeout(holdT); holdT = null; };
     const down = (e) => {
+      onEvent?.(`pointerdown type=${e.pointerType} button=${e.button}`);
       if (e.button != null && e.button !== 0) return;
       held = false;
       stop();
@@ -111,6 +113,7 @@
     };
     const click = (e) => {
       stop();
+      onEvent?.(`click held=${held}`);
       if (held) { held = false; e.preventDefault(); e.stopPropagation(); return; }
       if (onDouble) {
         const now = Date.now();
