@@ -55,7 +55,8 @@
         charging = !!s.plugged;
       } else if (t && this.hass && this._config.show_state !== false) {
         const st = stateOf(this.hass, t);
-        if (!st.online) sub = `${t.name} offline`;
+        if (st.reconnecting) sub = `${t.name} reconnecting`;
+        else if (!st.online) sub = `${t.name} offline`;
         else sub = [st.level != null ? `${Math.round(st.level)}%` : null, st.charging ? "charging" : null, st.on ? "screen on" : "screen off"].filter(Boolean).join(", ");
         charging = st.charging;
       }
@@ -215,7 +216,8 @@
         case "status": {
           icon = icon || (st?.charging ? "mdi:tablet-cellphone" : "mdi:tablet");
           if (!t) { text = text ?? "No tablet"; color = color || "grey"; break; }
-          if (!st.online) { text = text ?? `${c.name || t.short} offline`; color = color || "red"; break; }
+          if (st.reconnecting) { text = text ?? `${c.name || t.short} reconnecting`; color = color || "amber"; break; }
+        if (!st.online) { text = text ?? `${c.name || t.short} offline`; color = color || "red"; break; }
           const bits = [];
           if (c.name) bits.push(c.name);
           if (want.includes("battery") && st.level != null) bits.push(`${Math.round(st.level)}%`);
@@ -227,8 +229,8 @@
         }
         case "screen": {
           icon = icon || (st?.on ? "mdi:monitor" : "mdi:monitor-off");
-          text = text ?? (!st ? "" : !st.online ? "Offline" : st.on ? (c.name || "Screen on") : (c.name || "Screen off"));
-          color = color || (!st?.online ? "red" : st.on ? "blue" : "grey");
+          text = text ?? (!st ? "" : st.reconnecting ? "Reconnecting" : !st.online ? "Offline" : st.on ? (c.name || "Screen on") : (c.name || "Screen off"));
+          color = color || (st?.reconnecting ? "amber" : !st?.online ? "red" : st.on ? "blue" : "grey");
           break;
         }
         case "battery": {

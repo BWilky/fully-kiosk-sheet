@@ -315,7 +315,8 @@
       if (t.key === resolveLocal(this.hass) && this._snap) return this._localOn() ? "on" : "off";
       const I = ids(t.prefix);
       const st = this._st(I.screen);
-      if (!st || DEAD.includes(st.state)) return "offline";
+      const reach = reachState(st);
+      if (reach !== "online") return reach;
       return this._screenOn(I) ? "on" : "off";
     }
 

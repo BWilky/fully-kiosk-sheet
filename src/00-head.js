@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.1.5";
+  const VERSION = "1.1.6";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -75,6 +75,11 @@
   /* Configuration + tablet registry                                     */
   /* ================================================================== */
   const DEAD = ["unavailable", "unknown"];
+  /* The fully_kiosk integration marks the whole device unavailable after one failed 30 s poll;
+     within this window a tablet counts as "reconnecting" rather than offline. */
+  const GRACE_MS = 90000;
+  const deadFor = (st) => (st && DEAD.includes(st.state) ? Math.max(0, Date.now() - Date.parse(st.last_changed || 0)) : 0);
+  const reachState = (st) => { if (!st) return "offline"; if (!DEAD.includes(st.state)) return "online"; return deadFor(st) < GRACE_MS ? "reconnecting" : "offline"; };
   const OVERVIEW = "overview";
   const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 

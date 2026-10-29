@@ -48,7 +48,7 @@
 (async () => {
   if (window.__fullyTabletSheet) return;
   window.__fullyTabletSheet = true;
-  const VERSION = "1.1.5";
+  const VERSION = "1.1.6";
   const TAG = "[fully-tablet-sheet]";
 
   /* ---------- Lit from the HA frontend ---------- */
@@ -75,6 +75,11 @@
   /* Configuration + tablet registry                                     */
   /* ================================================================== */
   const DEAD = ["unavailable", "unknown"];
+  /* The fully_kiosk integration marks the whole device unavailable after one failed 30 s poll;
+     within this window a tablet counts as "reconnecting" rather than offline. */
+  const GRACE_MS = 90000;
+  const deadFor = (st) => (st && DEAD.includes(st.state) ? Math.max(0, Date.now() - Date.parse(st.last_changed || 0)) : 0);
+  const reachState = (st) => { if (!st) return "offline"; if (!DEAD.includes(st.state)) return "online"; return deadFor(st) < GRACE_MS ? "reconnecting" : "offline"; };
   const OVERVIEW = "overview";
   const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
@@ -716,7 +721,8 @@
       if (t.key === resolveLocal(this.hass) && this._snap) return this._localOn() ? "on" : "off";
       const I = ids(t.prefix);
       const st = this._st(I.screen);
-      if (!st || DEAD.includes(st.state)) return "offline";
+      const reach = reachState(st);
+      if (reach !== "online") return reach;
       return this._screenOn(I) ? "on" : "off";
     }
 
@@ -964,12 +970,16 @@
       if (!order.length) return this._renderEmpty();
       const stats = order.map((x) => this._status(x));
       const offline = stats.filter((s) => s === "offline").length;
+      const recon = stats.filter((s) => s === "reconnecting").length;
       const onCount = stats.filter((s) => s === "on").length;
+      const label = (st) => st === "offline" ? "Offline" : st === "reconnecting" ? "Reconnecting" : `Screen ${st}`;
       const chip = this.single
-        ? html`<span class="chip ${stats[0] === "on" ? "on" : stats[0] === "offline" ? "warn" : ""}">${stats[0] === "offline" ? "Offline" : `Screen ${stats[0]}`}</span>`
+        ? html`<span class="chip ${stats[0] === "on" ? "on" : stats[0] === "offline" ? "warn" : stats[0] === "reconnecting" ? "attn" : ""}">${label(stats[0])}</span>`
         : offline
           ? html`<span class="chip warn">${offline} offline</span>`
-          : html`<span class="chip ${onCount ? "on" : ""}">${onCount} of ${order.length} on</span>`;
+          : recon
+            ? html`<span class="chip attn">${recon} reconnecting</span>`
+            : html`<span class="chip ${onCount ? "on" : ""}">${onCount} of ${order.length} on</span>`;
       return this._dialog ? this._renderDialog(order, stats, chip) : this._renderSheet(order, stats, chip);
     }
 
@@ -1033,7 +1043,7 @@
                 return html`
                   <button class="tab ${x.key === t.key ? "on" : ""}" role="tab"
                     aria-selected=${x.key === t.key ? "true" : "false"}
-                    title=${me ? `${x.name} · this tablet` : `${x.name} · ${stats[i] === "offline" ? "offline" : `screen ${stats[i]}`}`}
+                    title=${me ? `${x.name} · this tablet` : `${x.name} · ${["offline", "reconnecting"].includes(stats[i]) ? stats[i] : `screen ${stats[i]}`}`}
                     @click=${() => this._setTab(x.key)}>
                     ${me ? html`<ha-icon class="here" icon="mdi:map-marker"></ha-icon>` : html`<span class="dot ${stats[i]}"></span>`}${x.short}</button>`;
               })}
@@ -1073,7 +1083,7 @@
                 const low = bat && bat.level < 20 && !bat.charging;
                 return html`
                   <button class="nav-item ${sel ? "on" : ""}" role="tab" aria-selected=${sel ? "true" : "false"}
-                    aria-label="${x.name}${me ? ", this tablet" : ""}, ${stats[i] === "offline" ? "offline" : `screen ${stats[i]}`}${bat ? `, battery ${Math.round(bat.level)}%` : ""}"
+                    aria-label="${x.name}${me ? ", this tablet" : ""}, ${["offline", "reconnecting"].includes(stats[i]) ? stats[i] : `screen ${stats[i]}`}${bat ? `, battery ${Math.round(bat.level)}%` : ""}"
                     @click=${() => this._setTab(x.key)}>
                     <span class="nav-dot"><span class="dot ${stats[i]}"></span></span>
                     <span class="nav-name">${x.name}</span>
@@ -1138,7 +1148,8 @@
     }
     _ovCard(t, status) {
       const I = ids(t.prefix);
-      const online = status !== "offline";
+      const online = status === "on" || status === "off";
+      const recon = status === "reconnecting";
       const on = status === "on";
       const me = t.key === resolveLocal(this.hass);
       const url = online ? this._shotUrl(I, this._ovTs) : null;
@@ -1154,14 +1165,14 @@
           <button class="ov-shot" @click=${() => this._setTab(t.key)} aria-label="Open ${t.name}">
             ${url ? html`<img src=${url} alt="Screenshot of the ${t.name} tablet" loading="lazy" decoding="async"
                 @error=${(e) => (e.target.style.visibility = "hidden")} @load=${(e) => (e.target.style.visibility = "visible")} />`
-              : html`<div class="ov"><ha-icon .icon=${online ? "mdi:image-off-outline" : "mdi:tablet-off"}></ha-icon>${online ? "No screenshot" : "Offline"}</div>`}
+              : html`<div class="ov"><ha-icon .icon=${online ? "mdi:image-off-outline" : recon ? "mdi:lan-pending" : "mdi:tablet-off"}></ha-icon>${online ? "No screenshot" : recon ? "Reconnecting" : "Offline"}</div>`}
             ${online && !on ? html`<span class="badge"><ha-icon icon="mdi:monitor-off"></ha-icon>Screen off</span>` : ""}
           </button>
           <div class="row">
             <span class="dot ${status}"></span>
             <div class="row-text">
               <span class="row-title">${t.name}${me ? html`<ha-icon class="here-sm" icon="mdi:map-marker"></ha-icon>` : ""}</span>
-              <span class="row-sub">${!online ? "Offline" : on ? "Screen on" : "Screen off"}${away
+              <span class="row-sub">${recon ? "Reconnecting" : !online ? "Offline" : on ? "Screen on" : "Screen off"}${away
                 ? html` · <span class="attn-t" title=${app.pkg}>${app.name} in front</span>` : ""}${bat
                 ? html` · <span class=${low ? "warn-t" : ""}>${Math.round(bat.level)}%${bat.charging ? ", charging" : ""}</span>` : ""}</span>
             </div>
@@ -1175,15 +1186,24 @@
     /* ---------- remote tablet: controls ---------- */
     _tabBody(t, status) {
       const I = ids(t.prefix);
-      const online = status !== "offline";
+      const online = status === "on" || status === "off";
+      const recon = status === "reconnecting";
       const on = status === "on";
+      const lost = deadFor(this._st(I.screen));
       return html`<div class="tab-body ${this._dialog ? "cols" : ""}">
-        ${online ? "" : html`
+        ${online ? "" : recon ? html`
+          <div class="section recon-box full">
+            <ha-icon class="spin" icon="mdi:loading"></ha-icon>
+            <div class="row-text">
+              <span class="row-title">Reconnecting to the ${t.name} tablet</span>
+              <span class="row-sub">A poll failed ${Math.round(lost / 1000)} s ago; Home Assistant tries again every 30 s. Controls return as soon as it answers.</span>
+            </div>
+          </div>` : html`
           <div class="section offline-box full">
             <ha-icon icon="mdi:tablet-off"></ha-icon>
             <div class="row-text">
               <span class="row-title">${t.name} tablet is offline</span>
-              <span class="row-sub">Home Assistant can't reach Fully on it. Check that it has power and Wi-Fi.</span>
+              <span class="row-sub">Home Assistant hasn't reached Fully on it for ${fmtDur(lost)}. Check that it has power and Wi-Fi.</span>
             </div>
           </div>`}
         ${this._dialog ? html`
@@ -1202,7 +1222,7 @@
       const portrait = orient === 0 || orient === 180;
       const loading = online && this._shotState === "loading";
       let overlay = "";
-      if (!online) overlay = html`<div class="ov"><ha-icon icon="mdi:tablet-off"></ha-icon>No screenshot while offline</div>`;
+      if (!online) overlay = html`<div class="ov"><ha-icon .icon=${this._status(t) === "reconnecting" ? "mdi:lan-pending" : "mdi:tablet-off"}></ha-icon>${this._status(t) === "reconnecting" ? "Reconnecting…" : "No screenshot while offline"}</div>`;
       else if (!url) overlay = html`<div class="ov"><ha-icon icon="mdi:image-off-outline"></ha-icon>No screenshot entity for this tablet</div>`;
       else if (this._shotState === "error") overlay = html`<div class="ov"><ha-icon icon="mdi:image-off-outline"></ha-icon>
           Couldn't get a screenshot<small>Check that screenshots are allowed in Fully's Remote Administration settings. Tap to try again.</small></div>`;
@@ -1255,7 +1275,7 @@
             <div class="row-icon ${on ? "on" : ""}"><ha-icon .icon=${on ? "mdi:monitor" : "mdi:monitor-off"}></ha-icon></div>
             <div class="row-text">
               <span class="row-title">Screen</span>
-              <span class="row-sub">${!online ? "Unavailable" : on ? "On" : "Off"}</span>
+              <span class="row-sub">${!online ? (this._status(t) === "reconnecting" ? "Reconnecting" : "Unavailable") : on ? "On" : "Off"}</span>
             </div>
             ${this._toggle(on, !online || !scr, () => this._toggleScreen(t, I))}
           </div>
@@ -1818,6 +1838,7 @@
         .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--disabled-color, #8a8a8a); }
         .dot.on { background: var(--ok); }
         .dot.offline { background: var(--danger); }
+        .dot.reconnecting { background: var(--warn); }
 
         /* ---- tablet / desktop: centred dialog with sidebar ---- */
         .dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1060px, 94vw); height: min(86vh, 880px);
@@ -2011,6 +2032,9 @@
         .offline-box { flex-direction: row; align-items: center; gap: 12px;
           background: color-mix(in srgb, var(--danger) 10%, var(--secondary-background-color, transparent)); }
         .offline-box > ha-icon { color: var(--danger); flex-shrink: 0; }
+        .recon-box { flex-direction: row; align-items: center; gap: 12px;
+          background: color-mix(in srgb, var(--warn) 12%, var(--secondary-background-color, transparent)); }
+        .recon-box > ha-icon { color: var(--warn); flex-shrink: 0; }
 
         /* tablet details */
         details.info { gap: 0; }
@@ -2278,12 +2302,13 @@
     const me = t.key === lk && local.ok;
     const snap = me ? local.lite() : null;
     const scr = hass.states?.[I.screen];
-    const online = me ? true : !!scr && !DEAD.includes(scr.state);
+    const reach = me ? "online" : reachState(scr);
+    const online = reach === "online";
     const on = me ? snap?.screenOn !== false : scr?.state === "on";
     const level = me && Number.isFinite(Number(snap?.battery)) ? Number(snap.battery) : parseFloat(hass.states?.[I.battery]?.state);
     const charging = me ? !!snap?.plugged : hass.states?.[I.plugged]?.state === "on";
     const app = me ? null : appInfo(hass.states?.[I.fg]?.state);
-    return { I, me, online, on, level: Number.isFinite(level) ? level : null, charging, app };
+    return { I, me, online, reconnecting: reach === "reconnecting", on, level: Number.isFinite(level) ? level : null, charging, app };
   };
 
   /* ================================================================== */
@@ -2342,7 +2367,8 @@
         charging = !!s.plugged;
       } else if (t && this.hass && this._config.show_state !== false) {
         const st = stateOf(this.hass, t);
-        if (!st.online) sub = `${t.name} offline`;
+        if (st.reconnecting) sub = `${t.name} reconnecting`;
+        else if (!st.online) sub = `${t.name} offline`;
         else sub = [st.level != null ? `${Math.round(st.level)}%` : null, st.charging ? "charging" : null, st.on ? "screen on" : "screen off"].filter(Boolean).join(", ");
         charging = st.charging;
       }
@@ -2502,7 +2528,8 @@
         case "status": {
           icon = icon || (st?.charging ? "mdi:tablet-cellphone" : "mdi:tablet");
           if (!t) { text = text ?? "No tablet"; color = color || "grey"; break; }
-          if (!st.online) { text = text ?? `${c.name || t.short} offline`; color = color || "red"; break; }
+          if (st.reconnecting) { text = text ?? `${c.name || t.short} reconnecting`; color = color || "amber"; break; }
+        if (!st.online) { text = text ?? `${c.name || t.short} offline`; color = color || "red"; break; }
           const bits = [];
           if (c.name) bits.push(c.name);
           if (want.includes("battery") && st.level != null) bits.push(`${Math.round(st.level)}%`);
@@ -2514,8 +2541,8 @@
         }
         case "screen": {
           icon = icon || (st?.on ? "mdi:monitor" : "mdi:monitor-off");
-          text = text ?? (!st ? "" : !st.online ? "Offline" : st.on ? (c.name || "Screen on") : (c.name || "Screen off"));
-          color = color || (!st?.online ? "red" : st.on ? "blue" : "grey");
+          text = text ?? (!st ? "" : st.reconnecting ? "Reconnecting" : !st.online ? "Offline" : st.on ? (c.name || "Screen on") : (c.name || "Screen off"));
+          color = color || (st?.reconnecting ? "amber" : !st?.online ? "red" : st.on ? "blue" : "grey");
           break;
         }
         case "battery": {

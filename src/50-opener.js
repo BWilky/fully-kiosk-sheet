@@ -156,10 +156,11 @@
     const me = t.key === lk && local.ok;
     const snap = me ? local.lite() : null;
     const scr = hass.states?.[I.screen];
-    const online = me ? true : !!scr && !DEAD.includes(scr.state);
+    const reach = me ? "online" : reachState(scr);
+    const online = reach === "online";
     const on = me ? snap?.screenOn !== false : scr?.state === "on";
     const level = me && Number.isFinite(Number(snap?.battery)) ? Number(snap.battery) : parseFloat(hass.states?.[I.battery]?.state);
     const charging = me ? !!snap?.plugged : hass.states?.[I.plugged]?.state === "on";
     const app = me ? null : appInfo(hass.states?.[I.fg]?.state);
-    return { I, me, online, on, level: Number.isFinite(level) ? level : null, charging, app };
+    return { I, me, online, reconnecting: reach === "reconnecting", on, level: Number.isFinite(level) ? level : null, charging, app };
   };

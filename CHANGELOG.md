@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.6 — 2026-10-29
+
+- The fully_kiosk integration marks a tablet unavailable after one failed 30 s poll. For the first
+  90 s that now reads "Reconnecting" (amber, controls greyed, chips keep their colour) instead of
+  flipping to red "Offline" on every missed poll.
+
 ## 1.1.5 — 2026-10-29
 
 - Chips created by Mushroom's chips card before this module had loaded never reacted to taps on

@@ -60,6 +60,7 @@
         .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--disabled-color, #8a8a8a); }
         .dot.on { background: var(--ok); }
         .dot.offline { background: var(--danger); }
+        .dot.reconnecting { background: var(--warn); }
 
         /* ---- tablet / desktop: centred dialog with sidebar ---- */
         .dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1060px, 94vw); height: min(86vh, 880px);
@@ -253,6 +254,9 @@
         .offline-box { flex-direction: row; align-items: center; gap: 12px;
           background: color-mix(in srgb, var(--danger) 10%, var(--secondary-background-color, transparent)); }
         .offline-box > ha-icon { color: var(--danger); flex-shrink: 0; }
+        .recon-box { flex-direction: row; align-items: center; gap: 12px;
+          background: color-mix(in srgb, var(--warn) 12%, var(--secondary-background-color, transparent)); }
+        .recon-box > ha-icon { color: var(--warn); flex-shrink: 0; }
 
         /* tablet details */
         details.info { gap: 0; }
